@@ -1,0 +1,345 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CPU Process Scheduling Simulator</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="app-container">
+        <!-- 1. Header Section -->
+        <header class="app-header">
+            <div class="header-content">
+                <div class="badge">Operating Systems Laboratory</div>
+                <h1>CPU Process Scheduling Simulator</h1>
+                <p class="subtitle">
+                    An interactive simulator for visualizing CPU scheduling algorithms, calculating scheduling metrics, and comparing execution performance.
+                </p>
+            </div>
+        </header>
+
+        <!-- Main Dashboard Grid -->
+        <main class="dashboard-grid">
+            <!-- Left Column: Controls & Configuration -->
+            <section class="card config-card" aria-labelledby="config-heading">
+                <div class="card-header">
+                    <h2 id="config-heading">Algorithm Selection</h2>
+                    <span class="card-tag">Configuration</span>
+                </div>
+                
+                <div class="algorithm-selector-group">
+                    <label class="algo-option">
+                        <input type="radio" name="algorithm" value="FCFS" checked>
+                        <div class="algo-box">
+                            <span class="algo-title">FCFS</span>
+                        </div>
+                    </label>
+
+                    <label class="algo-option">
+                        <input type="radio" name="algorithm" value="SJF">
+                        <div class="algo-box">
+                            <span class="algo-title">SJF</span>
+                        </div>
+                    </label>
+
+                    <label class="algo-option">
+                        <input type="radio" name="algorithm" value="Priority">
+                        <div class="algo-box">
+                            <span class="algo-title">Priority Scheduling</span>
+                        </div>
+                    </label>
+
+                    <label class="algo-option">
+                        <input type="radio" name="algorithm" value="RR">
+                        <div class="algo-box">
+                            <span class="algo-title">Round Robin</span>
+                        </div>
+                    </label>
+                </div>
+
+                <!-- Time Quantum Field (only for Round Robin) -->
+                <div id="quantum-container" class="quantum-container hidden">
+                    <div class="form-group">
+                        <label for="time-quantum">
+                            <strong>Time Quantum (TQ):</strong>
+                            <span class="field-hint">Time slice duration for each process in the ready queue</span>
+                        </label>
+                        <div class="input-with-action">
+                            <input type="number" id="time-quantum" min="1" step="1" value="2" placeholder="e.g. 2">
+                            <span class="input-unit">time units</span>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Right Column: Process Input Table & Actions -->
+            <section class="card input-card" aria-labelledby="input-heading">
+                <div class="card-header">
+                    <h2 id="input-heading">Process Input Table</h2>
+                    <div class="header-actions">
+                        <button type="button" class="btn btn-outline btn-sm" id="btn-load-example" title="Load predefined test case">
+                            <span class="btn-icon">&#128221;</span> Load Example Data
+                        </button>
+                        <button type="button" class="btn btn-ghost btn-sm" id="btn-clear-all" title="Clear all input rows">
+                            <span class="btn-icon">&#128465;</span> Clear All
+                        </button>
+                    </div>
+                </div>
+
+                <!-- ⚡ Live System Mode Box -->
+                <div class="live-system-mode-box" id="live-system-mode-box">
+                    <div class="live-mode-header">
+                        <div class="live-mode-title">
+                            <span class="live-mode-icon">&#9889;</span>
+                            <h3>Live System Mode</h3>
+                            <span class="mode-status-badge badge-manual" id="mode-status-badge">Manual Mode</span>
+                        </div>
+                        <div class="live-mode-actions">
+                            <button type="button" class="btn btn-live-detect" id="btn-detect-processes" title="Detect currently running processes on this computer">
+                                <span class="btn-icon">&#128269;</span> Detect Running Processes
+                            </button>
+                            <button type="button" class="btn btn-live-refresh hidden" id="btn-refresh-processes" title="Take a new process snapshot">
+                                <span class="btn-icon">&#128260;</span> Refresh Processes
+                            </button>
+                            <button type="button" class="btn btn-ghost btn-sm hidden" id="btn-switch-manual" title="Switch back to manual P1, P2, P3 entry">
+                                &#9998; Switch to Manual Mode
+                            </button>
+                        </div>
+                    </div>
+                    <p class="live-mode-desc">
+                        Detect currently running processes on this computer and use their recent CPU activity as input for the scheduling simulation.
+                    </p>
+                    <div class="live-mode-disclaimer">
+                        <strong>Educational Disclaimer:</strong> The application monitors currently running processes and uses their recent CPU activity to create an estimated workload for an educational CPU scheduling simulation. It does not replace, control, or modify the operating system's actual CPU scheduler.
+                    </div>
+                    <!-- Backend Unavailable Alert Container -->
+                    <div id="live-backend-alert" class="alert alert-warning hidden" role="alert">
+                        <div class="alert-icon">&#9888;</div>
+                        <div class="alert-content" id="live-backend-alert-text">
+                            Live System Mode unavailable. Start the local Python backend to detect running processes.
+                        </div>
+                        <button type="button" class="alert-close" id="backend-alert-close-btn">&times;</button>
+                    </div>
+                    <!-- Live Mode Active Info Notice -->
+                    <div id="live-active-notice" class="live-active-notice hidden">
+                        <div class="live-notice-item">
+                            <span class="notice-bullet">&bull;</span>
+                            <span><strong>Estimated Burst Time:</strong> Derived from recent CPU activity for simulation purposes. It is not the exact future CPU burst time of the real process.</span>
+                        </div>
+                        <div class="live-notice-item">
+                            <span class="notice-bullet">&bull;</span>
+                            <span><strong>Arrival Time = 0:</strong> All detected processes are treated as the current workload entering the simulation at the same simulation starting point.</span>
+                        </div>
+                        <div class="live-notice-item">
+                            <span class="notice-bullet">&bull;</span>
+                            <span><strong>Simulation Priority:</strong> Assigned for simulation and does not represent the actual OS scheduler priority.</span>
+                        </div>
+                    </div>
+                </div>
+
+                <p class="section-desc" id="table-instruction-desc">
+                    Enter the process details below or detect live processes. For Priority scheduling, a <strong>smaller priority number denotes higher priority</strong> (e.g., 1 is higher than 3).
+                </p>
+
+                <!-- Process Input Table -->
+                <div class="table-responsive">
+                    <table class="data-table input-table" id="process-input-table">
+                        <thead>
+                            <tr>
+                                <th style="width: 26%;" id="th-process-id">Process ID</th>
+                                <th style="width: 20%;" id="th-arrival-time">Arrival Time (AT)</th>
+                                <th style="width: 24%;" id="th-burst-time">Burst Time (BT)</th>
+                                <th style="width: 20%;" id="th-priority">Priority</th>
+                                <th style="width: 10%; text-align: center;">Action</th>
+                            </tr>
+                        </thead>
+                        <tbody id="process-table-body">
+                            <!-- Populated dynamically by script.js -->
+                        </tbody>
+                    </table>
+                </div>
+
+                <!-- Input Controls Bar -->
+                <div class="input-controls-bar">
+                    <button type="button" class="btn btn-secondary" id="btn-add-process">
+                        <span class="btn-icon">&#43;</span> Add Process
+                    </button>
+                    <button type="button" class="btn btn-secondary" id="btn-remove-last">
+                        <span class="btn-icon">&#8722;</span> Remove Last
+                    </button>
+                    <div class="action-spacer"></div>
+                    <button type="button" class="btn btn-outline" id="btn-compare-all">
+                        <span class="btn-icon">&#9878;</span> Compare All Algorithms
+                    </button>
+                    <button type="button" class="btn btn-primary" id="btn-run-simulation">
+                        <span class="btn-icon">&#9654;</span> Run Simulation
+                    </button>
+                </div>
+
+                <!-- Friendly Validation Alert Message Container -->
+                <div id="validation-alert" class="alert alert-error hidden" role="alert">
+                    <div class="alert-icon">&#9888;</div>
+                    <div class="alert-content" id="validation-message"></div>
+                    <button type="button" class="alert-close" id="alert-close-btn">&times;</button>
+                </div>
+            </section>
+        </main>
+
+        <!-- Simulation Results Section (Hidden until simulation is run) -->
+        <section id="results-section" class="results-section hidden" aria-labelledby="results-heading">
+            <div class="section-title-bar">
+                <h2 id="results-heading">Simulation Results</h2>
+                <span class="results-tag" id="current-sim-tag">Algorithm: FCFS</span>
+            </div>
+
+            <!-- Gantt Chart Card -->
+            <div class="card gantt-card">
+                <div class="card-header">
+                    <div>
+                        <h3>Visual Gantt Chart</h3>
+                        <p class="card-subtitle">Graphical representation of CPU execution timeline</p>
+                    </div>
+                    <div class="gantt-legend" id="gantt-legend">
+                        <!-- Legend items injected dynamically -->
+                    </div>
+                </div>
+
+                <div class="gantt-wrapper">
+                    <div class="gantt-container" id="gantt-container">
+                        <!-- Gantt blocks injected dynamically -->
+                    </div>
+                    <div class="gantt-timeline-scale" id="gantt-scale">
+                        <!-- Time tick marks injected dynamically -->
+                    </div>
+                </div>
+                <div class="gantt-caption">
+                    * Hover over or inspect segments to view process burst duration and start/finish timestamps. Striped blocks indicate <strong>CPU Idle</strong> time.
+                </div>
+            </div>
+
+            <!-- Performance Metrics Summary Cards -->
+            <div class="metrics-grid">
+                <div class="metric-card metric-primary">
+                    <div class="metric-icon">&#9201;</div>
+                    <div class="metric-info">
+                        <span class="metric-title">Avg Turnaround Time</span>
+                        <span class="metric-value" id="val-avg-tat">0.00</span>
+                        <span class="metric-unit">time units (ms)</span>
+                    </div>
+                    <div class="metric-formula">TAT = CT - AT</div>
+                </div>
+
+                <div class="metric-card metric-success">
+                    <div class="metric-icon">&#8987;</div>
+                    <div class="metric-info">
+                        <span class="metric-title">Avg Waiting Time</span>
+                        <span class="metric-value" id="val-avg-wt">0.00</span>
+                        <span class="metric-unit">time units (ms)</span>
+                    </div>
+                    <div class="metric-formula">WT = TAT - BT</div>
+                </div>
+
+                <div class="metric-card metric-info-card">
+                    <div class="metric-icon">&#9889;</div>
+                    <div class="metric-info">
+                        <span class="metric-title">Avg Response Time</span>
+                        <span class="metric-value" id="val-avg-rt">0.00</span>
+                        <span class="metric-unit">time units (ms)</span>
+                    </div>
+                    <div class="metric-formula">RT = First Start - AT</div>
+                </div>
+
+                <div class="metric-card metric-warning">
+                    <div class="metric-icon">&#128187;</div>
+                    <div class="metric-info">
+                        <span class="metric-title">CPU Utilization</span>
+                        <span class="metric-value" id="val-cpu-util">100.00%</span>
+                        <span class="metric-unit" id="val-time-details">Busy: 10 / Total: 10</span>
+                    </div>
+                    <div class="metric-progress-wrapper">
+                        <div class="metric-progress-bar" id="cpu-progress-bar" style="width: 100%;"></div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Process Results Table -->
+            <div class="card table-card">
+                <div class="card-header">
+                    <div>
+                        <h3>Calculated Process Schedule Table</h3>
+                        <p class="card-subtitle">Detailed breakdown of scheduling metrics per process (sorted by Process ID)</p>
+                    </div>
+                </div>
+
+                <div class="table-responsive">
+                    <table class="data-table results-table" id="results-table">
+                        <thead>
+                            <tr>
+                                <th>Process</th>
+                                <th>Arrival Time (AT)</th>
+                                <th>Burst Time (BT)</th>
+                                <th>Priority</th>
+                                <th>Completion Time (CT)</th>
+                                <th>Turnaround Time (TAT)</th>
+                                <th>Waiting Time (WT)</th>
+                                <th>Response Time (RT)</th>
+                            </tr>
+                        </thead>
+                        <tbody id="results-table-body">
+                            <!-- Injected dynamically -->
+                        </tbody>
+                        <tfoot id="results-table-foot">
+                            <!-- Average summary row injected dynamically -->
+                        </tfoot>
+                    </table>
+                </div>
+            </div>
+
+            <!-- Multi-Algorithm Comparison Section -->
+            <div class="card comparison-card" id="comparison-section">
+                <div class="card-header">
+                    <div>
+                        <h3>Multi-Algorithm Performance Comparison</h3>
+                        <p class="card-subtitle">Side-by-side performance comparison for the current set of processes</p>
+                    </div>
+                </div>
+
+                <div class="table-responsive">
+                    <table class="data-table comparison-table" id="comparison-table">
+                        <thead>
+                            <tr>
+                                <th>Algorithm</th>
+                                <th>Preemption</th>
+                                <th>Avg Waiting Time</th>
+                                <th>Avg Turnaround Time</th>
+                                <th>Avg Response Time</th>
+                                <th>CPU Utilization</th>
+                                <th>Key Characteristic</th>
+                            </tr>
+                        </thead>
+                        <tbody id="comparison-table-body">
+                            <!-- Injected dynamically -->
+                        </tbody>
+                    </table>
+                </div>
+
+                <div class="comparison-insight">
+                    <h4>Performance Analysis:</h4>
+                    <p id="comparison-analysis-text">
+                        Evaluating algorithms side-by-side reveals trade-offs between average waiting time, responsiveness, and algorithmic complexity. Note that no single algorithm is universally "best" — the optimal algorithm depends on whether the system prioritizes batch throughput (e.g. SJF), interactive responsiveness (e.g. Round Robin), urgency (e.g. Priority), or implementation simplicity (e.g. FCFS).
+                    </p>
+                </div>
+            </div>
+        </section>
+
+        <!-- Footer -->
+        <footer class="app-footer">
+            <p>CPU Process Scheduling Simulator &bull; Designed for Operating Systems Courses &bull; Pure Client-Side Application</p>
+        </footer>
+    </div>
+
+    <!-- Script File -->
+    <script src="script.js"></script>
+</body>
+</html>
